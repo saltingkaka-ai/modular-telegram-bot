@@ -1,0 +1,35 @@
+# Funding configuration
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# GitHub Sponsors
+# github: [username]
+
+# Patreon
+# patreon: username
+
+# Open Collective
+# open_collective: project-name
+
+# Ko-fi
+# ko_fi: username
+
+# Tidelift
+# tidelift: pypi/package-name
+
+# Community Bridge
+# community_bridge: project-name
+
+# Liberapay
+# liberapay: username
+
+# IssueHunt
+# issuehunt: username
+
+# Otechie
+# otechie: username
+
+# LFX Crowdfunding
+# lfx_crowdfunding: project-name
+
+# Custom URLs
+# custom: ["https://www.example.com/donate", "https://another-example.com/donate"]

@@ -1,0 +1,42 @@
+name: Greetings
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+jobs:
+  greeting:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+    - uses: actions/first-interaction@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        issue-message: |
+          👋 Hi @${{ github.actor }}!
+          
+          Terima kasih telah membuat issue! Kami akan segera meninjaunya.
+          
+          Sementara itu, pastikan untuk:
+          - [ ] Memberikan deskripsi yang jelas
+          - [ ] Menyertakan langkah reproduksi (untuk bug)
+          - [ ] Menyertakan informasi environment
+          
+          Jika ini adalah feature request, pertimbangkan untuk menjelaskan use case-nya!
+          
+          Happy coding! 🚀
+        pr-message: |
+          🎉 Hi @${{ github.actor }}!
+          
+          Terima kasih atas kontribusi Anda! Pull request Anda sangat kami hargai.
+          
+          Kami akan segera mereview PR ini. Sementara itu, pastikan:
+          - [ ] Semua test berjalan
+          - [ ] Kode mengikuti style guide
+          - [ ] Dokumentasi sudah diupdate (jika diperlukan)
+          
+          Thanks for contributing! 💙

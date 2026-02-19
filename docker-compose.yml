@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: modular-telegram-bot
+    restart: unless-stopped
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - BOT_NAME=${BOT_NAME:-ModularBot}
+      - ADMIN_IDS=${ADMIN_IDS}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./plugins:/app/plugins
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Database backup service
+  backup:
+    image: alpine:latest
+    container_name: modular-bot-backup
+    restart: "no"
+    volumes:
+      - ./data:/data:ro
+      - ./backups:/backups
+    command: >
+      sh -c "
+        apk add --no-cache sqlite &&
+        timestamp=$$(date +%Y%m%d_%H%M%S) &&
+        cp /data/bot_database.db /backups/backup_$$timestamp.db &&
+        echo 'Backup completed: backup_$$timestamp.db'
+      "
+    profiles:
+      - backup
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  data:
+  logs:
+  backups:

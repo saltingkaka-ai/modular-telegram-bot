@@ -1,0 +1,13 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/YOUR_USERNAME/modular-telegram-bot/blob/main/README.md
+    about: Check the documentation before creating an issue
+  
+  - name: Contributing Guidelines
+    url: https://github.com/YOUR_USERNAME/modular-telegram-bot/blob/main/CONTRIBUTING.md
+    about: Read our contributing guidelines
+  
+  - name: Discussions
+    url: https://github.com/YOUR_USERNAME/modular-telegram-bot/discussions
+    about: Ask questions and discuss ideas here
