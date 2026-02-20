@@ -43,7 +43,7 @@ class PluginManager:
         return len(self._plugins)
     
     def get_plugin(self, name: str) -> Optional[PluginBase]:
-        """Mendapatkan plugin berdasarkan nama"""
+        """Mendapatkan plugin berdasarkan nama (ID file)"""
         return self._plugins.get(name)
     
     def get_all_plugins(self) -> List[PluginBase]:
@@ -54,12 +54,32 @@ class PluginManager:
         """Mendapatkan informasi plugin"""
         plugin = self._plugins.get(name)
         if plugin:
-            return plugin.info.to_dict()
+            # Menggunakan attribute constant dari PluginBase
+            return {
+                "id": name,
+                "name": getattr(plugin, 'PLUGIN_NAME', name),
+                "description": getattr(plugin, 'PLUGIN_DESCRIPTION', ""),
+                "version": getattr(plugin, 'PLUGIN_VERSION', "1.0"),
+                "author": getattr(plugin, 'PLUGIN_AUTHOR', "Unknown"),
+                "category": getattr(plugin, 'PLUGIN_CATEGORY', "default")
+            }
         return None
     
     def get_all_plugin_info(self) -> List[Dict[str, Any]]:
-        """Mendapatkan informasi semua plugin"""
-        return [plugin.info.to_dict() for plugin in self._plugins.values()]
+        """Mendapatkan informasi semua plugin yang aktif"""
+        info_list = []
+        for internal_name, plugin in self._plugins.items():
+            info = {
+                "id": internal_name,  # Nama file sebagai ID unik
+                "name": getattr(plugin, 'PLUGIN_NAME', internal_name),
+                "description": getattr(plugin, 'PLUGIN_DESCRIPTION', ""),
+                "version": getattr(plugin, 'PLUGIN_VERSION', "1.0"),
+                "author": getattr(plugin, 'PLUGIN_AUTHOR', "Unknown"),
+                "category": getattr(plugin, 'PLUGIN_CATEGORY', "default"),
+                "is_active": getattr(plugin, 'is_active', True)
+            }
+            info_list.append(info)
+        return info_list
     
     def discover_plugins(self) -> List[str]:
         """
@@ -83,12 +103,6 @@ class PluginManager:
     def load_plugin(self, plugin_name: str) -> bool:
         """
         Load single plugin dari file.
-        
-        Args:
-            plugin_name: Nama file plugin (tanpa .py)
-        
-        Returns:
-            True jika berhasil, False jika gagal
         """
         try:
             plugin_path = os.path.join(self.plugins_folder, f"{plugin_name}.py")
@@ -130,13 +144,13 @@ class PluginManager:
             
             # Register ke database
             db.register_plugin(
-                name=plugin.PLUGIN_NAME,
-                description=plugin.PLUGIN_DESCRIPTION,
-                version=plugin.PLUGIN_VERSION,
-                author=plugin.PLUGIN_AUTHOR
+                name=getattr(plugin, 'PLUGIN_NAME', plugin_name),
+                description=getattr(plugin, 'PLUGIN_DESCRIPTION', ""),
+                version=getattr(plugin, 'PLUGIN_VERSION', "1.0"),
+                author=getattr(plugin, 'PLUGIN_AUTHOR', "System")
             )
             
-            logger.plugin_loaded(plugin.PLUGIN_NAME)
+            logger.plugin_loaded(getattr(plugin, 'PLUGIN_NAME', plugin_name))
             return True
             
         except Exception as e:
@@ -146,23 +160,11 @@ class PluginManager:
     def unload_plugin(self, plugin_name: str) -> bool:
         """
         Unload plugin.
-        
-        Args:
-            plugin_name: Nama plugin yang akan di-unload
-        
-        Returns:
-            True jika berhasil, False jika gagal
         """
         try:
             if plugin_name not in self._plugins:
                 logger.warning(f"Plugin {plugin_name} is not loaded")
                 return False
-            
-            plugin = self._plugins[plugin_name]
-            
-            # Panggil shutdown method
-            # Note: Ini async, perlu di-handle dengan cara khusus
-            # Untuk sekarang kita skip async shutdown
             
             # Hapus dari dictionary
             del self._plugins[plugin_name]
@@ -183,12 +185,7 @@ class PluginManager:
             return False
     
     def load_all_plugins(self) -> Dict[str, bool]:
-        """
-        Load semua plugin yang ditemukan.
-        
-        Returns:
-            Dictionary {plugin_name: success_status}
-        """
+        """Load semua plugin yang ditemukan"""
         results = {}
         plugin_files = self.discover_plugins()
         
@@ -198,57 +195,31 @@ class PluginManager:
             success = self.load_plugin(plugin_name)
             results[plugin_name] = success
         
-        # Log summary
         success_count = sum(1 for v in results.values() if v)
         logger.info(f"✅ Loaded {success_count}/{len(plugin_files)} plugin(s)")
         
         return results
     
     def reload_plugin(self, plugin_name: str) -> bool:
-        """
-        Reload plugin (unload lalu load lagi).
-        
-        Args:
-            plugin_name: Nama plugin yang akan di-reload
-        
-        Returns:
-            True jika berhasil, False jika gagal
-        """
+        """Reload plugin (unload lalu load lagi)"""
         if plugin_name in self._plugins:
             self.unload_plugin(plugin_name)
         return self.load_plugin(plugin_name)
     
     def reload_all_plugins(self) -> Dict[str, bool]:
-        """
-        Reload semua plugin.
-        
-        Returns:
-            Dictionary {plugin_name: success_status}
-        """
-        # Simpan nama plugin yang sudah diload
+        """Reload semua plugin"""
         loaded_plugins = list(self._plugins.keys())
-        
-        # Unload semua
         for plugin_name in loaded_plugins:
             self.unload_plugin(plugin_name)
-        
-        # Load ulang
         return self.load_all_plugins()
     
     def get_handlers_for_application(self) -> List:
-        """
-        Mendapatkan semua handlers untuk didaftarkan ke Application.
-        
-        Returns:
-            List of handlers
-        """
+        """Mendapatkan semua handlers untuk didaftarkan ke Application"""
         all_handlers = []
-        
         for plugin_name, plugin in self._plugins.items():
             handlers = plugin.get_handlers()
             self._handlers[plugin_name] = handlers
             all_handlers.extend(handlers)
-        
         return all_handlers
     
     async def initialize_all_plugins(self):
@@ -269,16 +240,14 @@ class PluginManager:
     
     def get_plugins_by_category(self, category: str) -> List[PluginBase]:
         """Mendapatkan plugin berdasarkan kategori"""
-        return [p for p in self._plugins.values() if p.PLUGIN_CATEGORY == category]
+        return [p for p in self._plugins.values() if getattr(p, 'PLUGIN_CATEGORY', '') == category]
     
     def search_plugins(self, query: str) -> List[PluginBase]:
         """Mencari plugin berdasarkan nama atau deskripsi"""
         query = query.lower()
         results = []
-        
         for plugin in self._plugins.values():
-            if (query in plugin.PLUGIN_NAME.lower() or 
-                query in plugin.PLUGIN_DESCRIPTION.lower()):
+            if (query in getattr(plugin, 'PLUGIN_NAME', '').lower() or 
+                query in getattr(plugin, 'PLUGIN_DESCRIPTION', '').lower()):
                 results.append(plugin)
-        
         return results

@@ -67,9 +67,11 @@ class PluginsMenuPlugin(PluginBase):
         
         # Tombol untuk setiap plugin
         for plugin_info in plugins:
-            emoji = self.get_category_emoji(plugin_info["category"])
+            emoji = self.get_category_emoji(plugin_info.get("category", "info"))
             btn_text = f"{emoji} {plugin_info['name']}"
-            callback_data = f"plugin_detail_{plugin_info['name']}"
+            # PENTING: Gunakan 'id' (nama file) bukan 'name' untuk callback data
+            plugin_id = plugin_info.get("id", plugin_info['name'].lower().replace(" ", "_"))
+            callback_data = f"plugin_detail_{plugin_id}" 
             keyboard.append([InlineKeyboardButton(btn_text, callback_data=callback_data)])
         
         # Tombol pagination
@@ -92,7 +94,7 @@ class PluginsMenuPlugin(PluginBase):
         keyboard.append([InlineKeyboardButton(BUTTON_BACK, callback_data="menu_main")])
         return InlineKeyboardMarkup(keyboard)
     
-    def create_plugin_detail_keyboard(self, plugin_name: str) -> InlineKeyboardMarkup:
+    def create_plugin_detail_keyboard(self, plugin_id: str) -> InlineKeyboardMarkup:
         """Membuat keyboard untuk detail plugin"""
         keyboard = [[InlineKeyboardButton(BUTTON_BACK, callback_data="plugins_list_0")]]
         return InlineKeyboardMarkup(keyboard)
@@ -145,13 +147,11 @@ class PluginsMenuPlugin(PluginBase):
             if banner_exists:
                 with open(self.BANNER_PATH, 'rb') as photo:
                     if query.message.photo:
-                        # Jika pesan sudah ada foto, edit media & caption
                         await query.edit_message_media(
                             media=InputMediaPhoto(media=photo, caption=text, parse_mode="HTML"),
                             reply_markup=keyboard
                         )
                     else:
-                        # Jika pesan sebelumnya teks, hapus dan kirim pesan foto baru
                         await query.message.delete()
                         await context.bot.send_photo(
                             chat_id=update.effective_chat.id,
@@ -161,7 +161,6 @@ class PluginsMenuPlugin(PluginBase):
                             reply_markup=keyboard
                         )
             else:
-                # Fallback: Jika gambar tidak ada, edit teks saja (atau delete jika sebelumnya foto)
                 if query.message.photo:
                     await query.message.delete()
                     await context.bot.send_message(
@@ -185,19 +184,21 @@ class PluginsMenuPlugin(PluginBase):
         query = update.callback_query
         await query.answer()
         
-        plugin_name = query.data.replace("plugin_detail_", "")
+        # Ambil ID/Key plugin dari data callback
+        plugin_id = query.data.replace("plugin_detail_", "")
         from bot import bot
-        plugin = bot.plugin_manager.get_plugin(plugin_name)
+        
+        # Cari berdasarkan ID (nama file) agar akurat
+        plugin = bot.plugin_manager.get_plugin(plugin_id)
         
         if not plugin:
-            text = f"⚠️ Plugin <b>{plugin_name}</b> tidak ditemukan!"
+            text = f"⚠️ Plugin <b>{plugin_id}</b> tidak ditemukan!"
             kb = InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data="plugins_list_0")]])
         else:
-            db.update_plugin_usage(plugin_name)
+            db.update_plugin_usage(plugin_id)
             text = plugin.get_info_text()
-            kb = self.create_plugin_detail_keyboard(plugin_name)
+            kb = self.create_plugin_detail_keyboard(plugin_id)
         
-        # Cek tipe pesan agar tidak error "no text in message"
         if query.message.photo:
             await query.edit_message_caption(caption=text, parse_mode="HTML", reply_markup=kb)
         else:
