@@ -1,3 +1,5 @@
+### NOT UPDATED!!!
+
 # Modular Telegram Bot
 
 Bot Telegram modular yang mudah dikembangkan dengan sistem plugin yang powerful.
