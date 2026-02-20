@@ -14,7 +14,7 @@ asyncio>=3.4.3
 python-dotenv>=1.0.0
 
 # Google Translate
-googletrans==4.0.0rc1
+googletrans
 
 # Optional - untuk fitur tambahan
 # requests>=2.28.0
