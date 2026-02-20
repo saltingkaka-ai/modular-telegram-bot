@@ -39,7 +39,7 @@ class TranslatePlugin(PluginBase):
     
     PLUGIN_NAME = "Translate"
     PLUGIN_DESCRIPTION = "Terjemahkan teks ke berbagai bahasa"
-    PLUGIN_VERSION = "1.0"
+    PLUGIN_VERSION = "1.1"
     PLUGIN_AUTHOR = "System"
     PLUGIN_CATEGORY = "utility"
     
@@ -80,15 +80,22 @@ class TranslatePlugin(PluginBase):
     
     def __init__(self):
         super().__init__()
-        self.translator = None
-        if HAS_TRANSLATOR:
-            self.translator = Translator()
+        # Jangan inisialisasi Translator di sini untuk versi async
     
     async def initialize(self):
         if not HAS_TRANSLATOR:
             logger.warning(f"Plugin {self.PLUGIN_NAME}: googletrans library not installed!")
             logger.warning("Install with: pip install googletrans==4.0.0rc1")
-        logger.info(f"Plugin {self.PLUGIN_NAME} initialized")
+        else:
+            # Test koneksi dengan membuat translator instance
+            try:
+                test_translator = Translator()
+                # Test detect sederhana untuk memastikan library bekerja
+                await test_translator.detect("hello")
+                logger.info(f"Plugin {self.PLUGIN_NAME} initialized (async mode)")
+            except Exception as e:
+                logger.warning(f"Plugin {self.PLUGIN_NAME}: Translator test failed: {e}")
+                logger.warning("Pastikan menggunakan: pip install googletrans==4.0.0rc1")
     
     async def shutdown(self):
         logger.info(f"Plugin {self.PLUGIN_NAME} shutdown")
@@ -153,6 +160,10 @@ class TranslatePlugin(PluginBase):
         
         logger.command_used(f"/translate {target_lang}", user.id, user.username)
         
+        # Buat translator instance baru untuk setiap request (thread-safe)
+        translator = Translator()
+        status_msg = None
+        
         try:
             # Show loading
             status_msg = await update.message.reply_text(
@@ -160,8 +171,8 @@ class TranslatePlugin(PluginBase):
                 parse_mode="HTML"
             )
             
-            # Translate
-            result = self.translator.translate(text, dest=target_lang)
+            # Translate - PERHATIKAN 'await' di sini
+            result = await translator.translate(text, dest=target_lang)
             
             # Get language names
             src_lang_name = self.get_language_name(result.src)
@@ -182,17 +193,23 @@ class TranslatePlugin(PluginBase):
             
         except Exception as e:
             error_msg = str(e)
-            if "destination language" in error_msg.lower() or "invalid" in error_msg.lower():
-                await status_msg.edit_text(
-                    f"❌ <b>Error:</b> Kode bahasa '<code>{target_lang}</code>' tidak valid!\n\n"
-                    f"Gunakan /translate tanpa parameter untuk melihat kode bahasa yang tersedia.",
-                    parse_mode="HTML"
-                )
+            if status_msg:
+                if "destination language" in error_msg.lower() or "invalid" in error_msg.lower():
+                    await status_msg.edit_text(
+                        f"❌ <b>Error:</b> Kode bahasa '<code>{target_lang}</code>' tidak valid!\n\n"
+                        f"Gunakan /translate tanpa parameter untuk melihat kode bahasa yang tersedia.",
+                        parse_mode="HTML"
+                    )
+                else:
+                    logger.error(f"Translation error: {e}")
+                    await status_msg.edit_text(
+                        f"❌ <b>Error:</b> Gagal menerjemahkan!\n"
+                        f"<i>{error_msg}</i>",
+                        parse_mode="HTML"
+                    )
             else:
-                logger.error(f"Translation error: {e}")
-                await status_msg.edit_text(
-                    f"❌ <b>Error:</b> Gagal menerjemahkan!\n"
-                    f"<i>{error_msg}</i>",
+                await update.message.reply_text(
+                    f"❌ <b>Error:</b> Gagal memproses permintaan!",
                     parse_mode="HTML"
                 )
     
@@ -228,18 +245,22 @@ class TranslatePlugin(PluginBase):
         text = " ".join(context.args)
         logger.command_used("/detect", user.id, user.username)
         
+        # Buat translator instance baru untuk setiap request
+        translator = Translator()
+        status_msg = None
+        
         try:
-            # Detect language
+            # Detect language - PERHATIKAN 'await' di sini
             status_msg = await update.message.reply_text(
                 "⏳ <b>Mendeteksi bahasa...</b>",
                 parse_mode="HTML"
             )
             
-            result = self.translator.detect(text)
+            result = await translator.detect(text)
             lang_name = self.get_language_name(result.lang)
             
             # Confidence percentage
-            confidence = int(result.confidence * 100)
+            confidence = int(result.confidence * 100) if result.confidence else 0
             
             response = (
                 f"🔍 <b>Deteksi Bahasa</b>\n\n"
@@ -252,10 +273,16 @@ class TranslatePlugin(PluginBase):
             
         except Exception as e:
             logger.error(f"Detection error: {e}")
-            await status_msg.edit_text(
-                f"❌ <b>Error:</b> Gagal mendeteksi bahasa!",
-                parse_mode="HTML"
-            )
+            if status_msg:
+                await status_msg.edit_text(
+                    f"❌ <b>Error:</b> Gagal mendeteksi bahasa!\n<i>{str(e)}</i>",
+                    parse_mode="HTML"
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ <b>Error:</b> Gagal mendeteksi bahasa!",
+                    parse_mode="HTML"
+                )
 
 
 # Instance plugin
