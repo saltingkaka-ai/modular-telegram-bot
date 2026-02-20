@@ -14,7 +14,8 @@ Contoh Penggunaan:
 ========================================
 """
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import os
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
 from core.plugin_base import PluginBase
@@ -33,6 +34,8 @@ class StartPlugin(PluginBase):
     PLUGIN_VERSION = "1.0"
     PLUGIN_AUTHOR = "System"
     PLUGIN_CATEGORY = "info"
+    
+    BANNER_PATH = "media/banner.jpg" # Lokasi gambar banner
     
     COMMANDS = [
         {"command": "start", "description": "Memulai bot", "handler": "cmd_start"},
@@ -70,6 +73,45 @@ class StartPlugin(PluginBase):
             ]
         ]
         return InlineKeyboardMarkup(keyboard)
+
+    async def _show_main_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, is_callback: bool = False):
+        """Helper internal untuk menampilkan menu dengan gambar atau teks"""
+        keyboard = self.get_main_menu_keyboard()
+
+        if os.path.exists(self.BANNER_PATH):
+            with open(self.BANNER_PATH, 'rb') as photo:
+                if is_callback:
+                    query = update.callback_query
+                    # Jika pesan saat ini sudah punya foto, edit medianya
+                    if query.message.photo:
+                        await query.edit_message_media(
+                            media=InputMediaPhoto(media=photo, caption=text, parse_mode="HTML"),
+                            reply_markup=keyboard
+                        )
+                    else:
+                        # Jika sebelumnya pesan teks, hapus dan kirim pesan foto baru
+                        await query.message.delete()
+                        await context.bot.send_photo(
+                            chat_id=update.effective_chat.id,
+                            photo=photo,
+                            caption=text,
+                            parse_mode="HTML",
+                            reply_markup=keyboard
+                        )
+                else:
+                    # Untuk command /start atau /menu
+                    await update.effective_message.reply_photo(
+                        photo=photo,
+                        caption=text,
+                        parse_mode="HTML",
+                        reply_markup=keyboard
+                    )
+        else:
+            # Fallback jika gambar banner tidak ditemukan
+            if is_callback:
+                await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)
+            else:
+                await update.effective_message.reply_text(text, parse_mode="HTML", reply_markup=keyboard)
     
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -88,29 +130,19 @@ class StartPlugin(PluginBase):
             is_bot=user.is_bot
         )
         
-        # Update aktivitas
         db.update_user_activity(user.id)
-        
-        # Log
         logger.command_used("/start", user.id, user.username)
         
-        # Hitung jumlah plugin
         from bot import bot
         plugin_count = bot.plugin_manager.plugin_count
         
-        # Format welcome message
         welcome_text = WELCOME_MESSAGE.format(
             bot_name=BOT_NAME,
             version=BOT_VERSION,
             plugin_count=plugin_count
         )
         
-        # Kirim pesan dengan menu
-        await update.message.reply_text(
-            welcome_text,
-            parse_mode="HTML",
-            reply_markup=self.get_main_menu_keyboard()
-        )
+        await self._show_main_menu(update, context, welcome_text, is_callback=False)
     
     async def cmd_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -132,12 +164,7 @@ class StartPlugin(PluginBase):
 
 <i>Pilih menu di bawah ini:</i>
 """
-        
-        await update.message.reply_text(
-            menu_text,
-            parse_mode="HTML",
-            reply_markup=self.get_main_menu_keyboard()
-        )
+        await self._show_main_menu(update, context, menu_text, is_callback=False)
     
     async def cb_menu_main(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -161,12 +188,7 @@ class StartPlugin(PluginBase):
 
 <i>Pilih menu di bawah ini:</i>
 """
-        
-        await query.edit_message_text(
-            menu_text,
-            parse_mode="HTML",
-            reply_markup=self.get_main_menu_keyboard()
-        )
+        await self._show_main_menu(update, context, menu_text, is_callback=True)
 
 # Instance plugin
 plugin = StartPlugin()
